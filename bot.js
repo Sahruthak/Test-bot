@@ -13,7 +13,7 @@ const errorSentMap = new Map();
 const acknowledgedErrors = new Set();
 const errorData = new Map();
 
-const { checkApiErrors } = require("./apiErrorChecker1.js");
+const { checkApiErrors } = require("./apiErrorChecker.js");
 
 client.on("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);

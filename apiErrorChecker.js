@@ -1,9 +1,14 @@
 const fetch = require("node-fetch");
 
 const apiEndpoints = {
-  health: "https://prod-wbtc-garden-monitor.onrender.com/health",
-  serviceStatus: "https://prod-wbtc-garden-monitor.onrender.com/service-status",
   cobiBalance: "https://prod-wbtc-garden-monitor.onrender.com/cobi-balance",
+  constraints: "https://prod-wbtc-garden-monitor.onrender.com/constraints",
+  networkFee: "https://prod-wbtc-garden-monitor.onrender.com/network-fee",
+  orderRate: "https://prod-wbtc-garden-monitor.onrender.com/order-rate",
+  serviceStatus: "https://prod-wbtc-garden-monitor.onrender.com/service-status",
+  store: "https://prod-wbtc-garden-monitor.onrender.com/store",
+  tokenPrice: "https://prod-wbtc-garden-monitor.onrender.com/token-price",
+  txnStats: "https://prod-wbtc-garden-monitor.onrender.com/txn-stats",
 };
 
 async function checkApiErrors() {
@@ -17,12 +22,6 @@ async function checkApiErrors() {
     }
   }
 
-  // Check the overall server health for all three APIs
-  const serverHealthError = await checkServerHealth();
-  if (serverHealthError) {
-    errors.push(serverHealthError);
-  }
-
   return errors;
 }
 
@@ -30,6 +29,13 @@ async function checkEndpointError(endpoint, url) {
   try {
     const response = await fetch(url);
     const data = await response.json();
+
+    // Check for false values in the response
+    if (hasFalseValues(data)) {
+      return `${endpoint} - Response contains false values: ${JSON.stringify(
+        data
+      )}`;
+    }
 
     // Error signature logic for each API
     const errorSignature = getErrorSignature(endpoint, response, data);
@@ -40,55 +46,49 @@ async function checkEndpointError(endpoint, url) {
   }
 }
 
-async function checkServerHealth() {
-  const serverEndpoints = Object.values(apiEndpoints);
-
-  for (const serverEndpoint of serverEndpoints) {
-    try {
-      const response = await fetch(serverEndpoint);
-
-      if (response.status === 200) {
-        const data = await response.json();
-
-        // Check for specific conditions indicating server health
-        if (data.status === "online") {
-          continue; // Move on to the next API
-        } else {
-          return `Server - Unexpected state for API at ${serverEndpoint}: ${data.status}`;
-        }
-      } else {
-        return `Server - Unexpected response status for API at ${serverEndpoint}: ${response.status}`;
+function hasFalseValues(obj) {
+  // Recursive function to check for false values in the response
+  for (const key of obj) {
+    if (typeof obj[key] === "object") {
+      if (hasFalseValues(obj[key])) {
+        return true;
       }
-    } catch (error) {
-      return `Server - Request Error for API at ${serverEndpoint}: ${error.message}`;
+    } else if (obj[key] === false) {
+      return true;
     }
   }
-
-  return null; // No errors detected for all APIs
+  return false;
 }
 
 function getErrorSignature(endpoint, response, data) {
-  if (response.status >= 400 && response.status < 500) {
-    return `${endpoint} - Client Error: ${response.status}`;
-  }
-  if (response.status >= 500 && response.status < 600) {
-    return `${endpoint} - Server Error: ${response.status}`;
-  }
-  if (data.error) {
-    return `${endpoint} - API Error: ${data.error}`;
+  if (response.status !== 200) {
+    return `${endpoint} - Unexpected response status: ${response.status}`;
   }
 
-  // Additional checks based on the response structure can be added here
-  if (
-    (endpoint === "health" ||
-      endpoint === "cobi-balance" ||
-      endpoint === "service status") &&
-    (!data.status || data.status !== "online")
-  ) {
-    return `${endpoint} - Unexpected response: ${response.status}`;
+  // Check for specific conditions indicating errors in the response data
+  switch (endpoint) {
+    case "cobiBalance":
+      if (!isValidCobiBalance(data)) {
+        return `${endpoint} - Invalid balance data: ${JSON.stringify(data)}`;
+      }
+      break;
+
+    // Add cases for other endpoints as needed
+
+    default:
+      break;
   }
 
   return null; // No errors detected
 }
+
+// Add specific validation functions for each endpoint data
+function isValidCobiBalance(data) {
+  // Implement your validation logic for cobiBalance data
+  // Example: Check if the balance values are valid numbers
+  return true;
+}
+
+// Add validation functions for other endpoints as needed
 
 module.exports = { checkApiErrors };
